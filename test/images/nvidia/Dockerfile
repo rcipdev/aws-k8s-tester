@@ -66,7 +66,7 @@ RUN curl -sL https://efa-installer.amazonaws.com/aws-efa-installer-$EFA_INSTALLE
  && cd && rm -rf /tmp/aws-efa-installer
 
 # Build nvbandwidth
-ARG NVBANDWIDTH_VERSION=v0.8
+ARG NVBANDWIDTH_VERSION=v0.9
 RUN apt install -y libboost-program-options-dev
 RUN git clone https://github.com/NVIDIA/nvbandwidth.git --branch $NVBANDWIDTH_VERSION /tmp/nvbandwidth \
  && cd /tmp/nvbandwidth \
