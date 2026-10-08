@@ -33,6 +33,23 @@ type Config struct {
 	NvidiaTestImage        string `flag:"nvidiaTestImage" desc:"nccl test image for nccl tests"`
 	PytorchImage           string `flag:"pytorchImage" desc:"pytorch cuda image for single node tests"`
 	SkipUnitTestSubcommand string `flag:"skipUnitTestSubcommand" desc:"optional command to skip specified unit test"`
+	// Deep DCGM diagnostics are opt-in: this binary is invoked without
+	// -test.run by several harnesses, so a new test function would otherwise
+	// run everywhere by default. See dcgm_test.go.
+	DcgmDiagEnabled        bool `flag:"dcgmDiagEnabled" desc:"run the deep DCGM diagnostic feature (long-running; not for per-build gates)"`
+	DcgmDiagLevel          int  `flag:"dcgmDiagLevel" desc:"dcgmi diag run level 1-4 (4 adds memtest+pulse and can exceed an hour)"`
+	DcgmDiagTimeoutMinutes int  `flag:"dcgmDiagTimeoutMinutes" desc:"wait timeout for the deep DCGM diagnostic Job, in minutes"`
+	// Time-slicing replaces the cluster's device plugin, so it is opt-in: some
+	// harnesses invoke this binary without -test.run, and there an unguarded run
+	// would oversubscribe GPUs underneath the other features. See
+	// time_slicing_test.go.
+	TimeSlicingEnabled  bool `flag:"timeSlicingEnabled" desc:"run the GPU time-slicing feature (reconfigures the cluster's NVIDIA device plugin)"`
+	TimeSlicingReplicas int  `flag:"timeSlicingReplicas" desc:"how many times the device plugin advertises each physical GPU under time-slicing"`
+	// MPS is opt-in for the same reason as time-slicing: it replaces the
+	// cluster's device plugin. It also sets the GPU compute mode, which the
+	// feature has to reset. See mps_test.go.
+	MpsEnabled  bool `flag:"mpsEnabled" desc:"run the GPU MPS feature (reconfigures the NVIDIA device plugin and sets compute mode to EXCLUSIVE_PROCESS)"`
+	MpsReplicas int  `flag:"mpsReplicas" desc:"how many times the device plugin advertises each physical GPU under MPS"`
 }
 
 var (
@@ -99,6 +116,20 @@ func TestMain(m *testing.M) {
 	testConfig = Config{
 		InstallDevicePlugin: true,
 		PytorchImage:        "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-ec2",
+		// Off by default on purpose (see dcgm_test.go). The 3-hour budget gives
+		// headroom over the ~80 minutes level 4 takes on an eight-GPU instance;
+		// NVIDIA allows up to 2.25h there.
+		DcgmDiagEnabled:        false,
+		DcgmDiagLevel:          4,
+		DcgmDiagTimeoutMinutes: 180,
+		// Off by default: reconfiguring the device plugin changes GPU
+		// advertisement for everything else on the node.
+		TimeSlicingEnabled:  false,
+		TimeSlicingReplicas: 10,
+		// Off by default: replaces the cluster's device plugin and changes the
+		// GPU compute mode.
+		MpsEnabled:  false,
+		MpsReplicas: 4,
 	}
 
 	_, err := common.ParseFlags(&testConfig)
